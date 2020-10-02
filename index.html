@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.9/vue.js"></script>
+  </head>
+  <body>
+    <div id="app">{{ msg }}</div>
+
+    <script>
+      const vm = new Vue({
+        el: "#app",
+        data: {
+          msg: "I am learning Vue",
+        },
+      });
+
+      //1. let's take a look at vm and vm.data
+      console.log(vm);
+      console.log(vm.data);
+      /* the result: vm is an object instance,which is what we want,
+                     vm.data is undefined, 
+                     but we are able to find its member(msg) directly from the vm instance
+         let's see the vm.msg    
+      */
+      console.log(vm.msg); // result: "I am learning Vue". it works
+
+      //2. why is that?
+      /*
+         firstly, we want to realize the responsive design, 
+         which means everything is under watched,
+         it would be easier to monitor the data when it exists under the first sublayer instead of the second or third
+         secondly, not only data object need to be watched, in most cases,
+         there are some other objects created to be watched as well. It works the same way as the first reason.
+      */
+
+      //3. what is $xxx and _xxx?
+      /*
+          They are both build-in varibles 
+          the varible initialed with $ is able to be used by user.
+          for example: $el, $set, $mount
+          the varible initialed with _ is not able to be used by user
+      */
+
+      //4. under those scenarios, the data can not be responsive.
+      /*
+           - undeclared varible
+           - declared but unused varible in DOM
+      */
+
+      //5. when we change the data, will the page be changed immediately?
+      /*
+          No. it is async. The rendering happens in microtask process
+          we take some examples:
+      */
+      vm.msg = "Javascript is the best!";
+      console.log(vm.msg, vm.$el.innerText); // vm.msg changed, but innerText do not
+      vm.msg = ".NET is the best!";
+      console.log(vm.msg, vm.$el.innerText); // vm.msg changed, but innerText do not
+      vm.msg = "Java is the best!";
+      console.log(vm.msg, vm.$el.innerText); // vm.msg changed, but innerText do not
+      //at last, on the HTML page, the msg will be "Java is the best"
+      /* setTimeout is a task which is excuted later than microtask. 
+        we take an exmple to see the difference
+     */
+      setTimeout(() => {
+        console.log(vm.msg, vm.$el.innerText);
+      }, 0); // vm.msg changed and innerText changed as well
+
+      //right after DOM rendered, excute what
+      //it can be used as a promise
+      vm.$nextTick(() => {
+        console.log(vm.msg, vm.$el.innerText);
+      });
+    </script>
+  </body>
+</html>
