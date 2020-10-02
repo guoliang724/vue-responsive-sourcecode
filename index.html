@@ -21,40 +21,53 @@
       console.log(vm);
       console.log(vm.data);
       /* the result: vm is an object instance,which is what we want,
-                     vm.data is undefined, 
-                     but we are able to find its member(msg) directly from the vm instance
-         let's see the vm.msg    
-      */
+                      vm.data is undefined,
+                      but we are able to find its member(msg) directly from the vm instance
+          let's see the vm.msg
+       */
       console.log(vm.msg); // result: "I am learning Vue". it works
 
       //2. why is that?
       /*
-         firstly, we want to realize the responsive design, 
-         which means everything is under watched,
-         it would be easier to monitor the data when it exists under the first sublayer instead of the second or third
-         secondly, not only data object need to be watched, in most cases,
-         there are some other objects created to be watched as well. It works the same way as the first reason.
-      */
+          firstly, we want to realize the responsive design,
+          which means everything is under watched,
+          it would be easier to monitor the data when it exists under the first sublayer instead of the second or third
+          secondly, not only data object need to be watched, in most cases,
+          there are some other objects created to be watched as well. It works the same way as the first reason.
+       */
 
       //3. what is $xxx and _xxx?
       /*
-          They are both build-in varibles 
-          the varible initialed with $ is able to be used by user.
-          for example: $el, $set, $mount
-          the varible initialed with _ is not able to be used by user
-      */
+           They are both build-in varibles
+           the varible initialed with $ is able to be used by user.
+           for example: $el, $set, $mount
+           the varible initialed with _ is not able to be used by user
+       */
 
       //4. under those scenarios, the data can not be responsive.
       /*
-           - undeclared varible
-           - declared but unused varible in DOM
-      */
+            - undeclared varible
+            - declared but unused varible in DOM
+            - Array: 1）reassign values to array can be watched
+                     2) change elements by index or change length can not be watched
+            - Object: add or delete members can not be watched
+
+            so,Vue offers some methods to work with Array and Object
+            Arry:
+             1. push,pop,shift,unshift,splice,sort,reverse
+             2. vm.$set(target,key,val)
+             3. vm.$delete(target,key)
+            Object:
+             1. vm.$set(target,key,val)
+             2. vm.$delete(target,key)
+
+       */
 
       //5. when we change the data, will the page be changed immediately?
       /*
-          No. it is async. The rendering happens in microtask process
-          we take some examples:
-      */
+           No. it is async. The rendering happens in microtask process
+           we take some examples:
+       */
       vm.msg = "Javascript is the best!";
       console.log(vm.msg, vm.$el.innerText); // vm.msg changed, but innerText do not
       vm.msg = ".NET is the best!";
@@ -62,9 +75,9 @@
       vm.msg = "Java is the best!";
       console.log(vm.msg, vm.$el.innerText); // vm.msg changed, but innerText do not
       //at last, on the HTML page, the msg will be "Java is the best"
-      /* setTimeout is a task which is excuted later than microtask. 
-        we take an exmple to see the difference
-     */
+      /* setTimeout is a task which is excuted later than microtask.
+         we take an exmple to see the difference
+      */
       setTimeout(() => {
         console.log(vm.msg, vm.$el.innerText);
       }, 0); // vm.msg changed and innerText changed as well
@@ -74,6 +87,122 @@
       vm.$nextTick(() => {
         console.log(vm.msg, vm.$el.innerText);
       });
+
+      //6. Object.definedProperty
+      (function () {
+        const data = {
+          name: "Guoliang",
+          age: 18,
+        };
+        let value = data.name;
+        //it works like the way how attributes work in C#
+        //when you read or write a field, actullay it invokes its getter and setter function
+        Object.defineProperty(data, "name", {
+          //read
+          get() {
+            console.log("read");
+            return value;
+          },
+          //write
+          set(newValue) {
+            console.log("write");
+            value = newValue;
+          },
+        });
+        //by now we can see the difference between data.name and data.age when we read or write those two
+        data.name = "Manny"; // console.log('write') invoke
+        console.log(data.name); // console.log('read') invoke
+        data.age = 20; //nothing invoke
+        console.log(data.age); //nothing invoke
+      })()(
+        //so, how to solve this problem that let each member be able to be watched
+        function () {
+          const data = {
+            name: "guoliang",
+            age: 18,
+            guoliang: {
+              name: "Guoliang",
+              age: 18,
+              obj: {},
+            },
+          };
+          function defineReactive(data, key, value) {
+            observe(value);
+            Object.defineProperty(data, key, {
+              //read
+              get() {
+                console.log("read");
+                return value;
+              },
+              //write
+              set(newValue) {
+                console.log("write");
+                if (value == newValue) return;
+                value = newValue;
+                render();
+              },
+            });
+          }
+          function observe(data) {
+            //do not iterate an array,as it cost too much
+            //that modify array methods is because we want the rendering after Array Operation
+            if (Array.isArray(data)) {
+              data._proto = arrayMethods;
+              return;
+            }
+            if (typeof data !== "object") return;
+            for (let key in data) {
+              defineReactive(data, key, data[key]);
+            }
+          }
+          function render() {
+            console.log("page is rendered");
+          }
+          observe(data);
+
+          //modify static memebers on Array
+          const oldPush = Array.prototype.push;
+          Array.prototype.push = function () {
+            oldPush().call(this, ...arguments);
+            render();
+          };
+          //like we did above, we modify those 7 methods in Vue
+          const arrayProto = Array.prototype;
+          const arrayMethods = Object.create(arrayProto);
+          [
+            "push",
+            "pop",
+            "shift",
+            "unshift",
+            "splice",
+            "sort",
+            "reverse",
+          ].forEach((method) => {
+            arrayProto[method] = function () {
+              arrayProto[method].call(this, ...arguments);
+              render();
+            };
+          });
+          //$set and $delete
+          function $set(data, key, value) {
+            if (Array.isArray(data)) {
+              data.splice(key, 1, value);
+              return value;
+            }
+            defineProperty(data, key, value);
+            render();
+            return value;
+          }
+          function $delete(data, key) {
+            if (Array.isArray(data)) {
+              data.splice(key, 1);
+              return;
+            }
+            delete data[key];
+            render();
+          }
+        }
+      )();
     </script>
   </body>
 </html>
